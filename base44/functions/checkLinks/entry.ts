@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
-import { err, safeUrl } from '../../shared/util.ts';
+import { err, safeUrl, verifyPlayer } from '../../shared/anonymous.ts';
 
-const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.|\[?::1)|\.(internal|local|localhost)$/i;
+const PRIVATE_HOST = /^(localhost|127\\.|10\\.|192\\.168\\.|169\\.254\\.|172\\.(1[6-9]|2\\d|3[01])\\.|0\\.|\\[?::1)|\\.(internal|local|localhost)$/i;
 
 async function check(url: string) {
   const u = safeUrl(url);
@@ -20,7 +20,7 @@ async function check(url: string) {
       ok: res.ok, blocked,
       note: res.ok ? 'Loads' : blocked ? 'Site blocks automated checks - verify by hand' : `HTTP ${res.status}`,
     };
-  } catch (e: any) {
+  } catch {
     return { url, ok: false, status: 0, note: 'Could not reach this address' };
   }
 }
@@ -28,17 +28,17 @@ async function check(url: string) {
 export default async function (req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me().catch((e: any) => (e.status === 401 ? null : Promise.reject(e)));
-    if (!user) return err('Unauthorized', 401);
-    const { urls } = await req.json().catch(() => ({}));
-    if (!Array.isArray(urls) || !urls.length) return err('urls required');
-    const list = [...new Set(urls.map(String))].slice(0, 20);
+    const body = await req.json().catch(() => ({}));
+    const player = await verifyPlayer(base44, body);
+    if (!player) return err('Your Player ID could not be verified. Refresh the app and try again.', 401);
+    if (!Array.isArray(body.urls) || !body.urls.length) return err('urls required');
+    const list = [...new Set(body.urls.map(String))].slice(0, 20);
     const results: any[] = [];
     for (let i = 0; i < list.length; i += 6) {
       results.push(...(await Promise.all(list.slice(i, i + 6).map(check))));
     }
     return Response.json({ results });
   } catch (error: any) {
-    return err(error.message, 500);
+    return err(error.message || 'Could not check source links', 500);
   }
 }
