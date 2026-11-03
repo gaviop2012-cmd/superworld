@@ -1,0 +1,40 @@
+name: WorldQuest checks
+
+on:
+  push:
+    branches: [main, anonymous-player-access]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-api-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run build
+      - name: Start standalone API
+        run: |
+          DB_PATH=/tmp/worldquest-ci.sqlite PORT=3001 npm start > /tmp/worldquest-api.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3001/api/health; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/worldquest-api.log
+          exit 1
+      - name: Verify anonymous player registration and API
+        run: |
+          node --input-type=module <<'NODE'
+          import { randomBytes } from "node:crypto";
+          const id = "WQ-" + randomBytes(12).toString("hex").toUpperCase().slice(0,12);
+          const secret = randomBytes(32).toString("hex");
+          const payload = { player_id:id, player_secret:secret, username:"CI Player", action:"register" };
+          const register = await fetch("http://127.0.0.1:3001/api/playerApi", {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+          if (!register.ok) throw new Error("Anonymous registration failed: "+await register.text());
+          const play = await fetch("http://127.0.0.1:3001/api/worldquestApi", {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({...payload,action:"listQuests"})});
+          if (!play.ok) throw new Error("Anonymous quest listing failed: "+await play.text());
+          console.log("Anonymous player registration and quest API passed");
+          NODE

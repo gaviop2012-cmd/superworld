@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -7,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/use-toast";
 import { Flag } from "lucide-react";
 import { REPORT_REASONS } from "@/lib/constants";
+import { callApi } from "@/lib/anonymousApi";
 
 export default function ReportButton({ questId }) {
   const [open, setOpen] = useState(false);
@@ -14,11 +14,11 @@ export default function ReportButton({ questId }) {
   const [details, setDetails] = useState("");
   const send = async () => {
     try {
-      const { data } = await base44.functions.invoke("reportQuest", { quest_id: questId, reason, details });
+      const data = await callApi("reportQuest", { quest_id: questId, reason, details });
       toast({ title: data.unlisted ? "Report received. This quest is now under review." : "Report received. Thank you." });
       setOpen(false);
-    } catch (e) {
-      toast({ title: e.response?.data?.error || "Could not send report", variant: "destructive" });
+    } catch (error) {
+      toast({ title: error.response?.data?.error || "Could not send report", variant: "destructive" });
     }
   };
   return (

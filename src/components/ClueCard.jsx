@@ -55,7 +55,7 @@ export default function ClueCard({ index, clue, solved, locked, onGrade, team, m
           {team.claim ? (
             <>
               <Badge variant="outline" className="gap-1"><Hand className="w-3 h-3" />{team.claim.username} is on it</Badge>
-              {(team.claim.user_id === meId || team.isOwner) && <Button size="sm" variant="ghost" onClick={() => team.onClaim(true)}>Release</Button>}
+              {(team.claim.player_id === meId || team.isOwner) && <Button size="sm" variant="ghost" onClick={() => team.onClaim(true)}>Release</Button>}
             </>
           ) : <Button size="sm" variant="outline" onClick={() => team.onClaim(false)}><Hand className="w-3.5 h-3.5 mr-1" />Claim this clue</Button>}
         </div>

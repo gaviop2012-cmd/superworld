@@ -1,67 +1,57 @@
-# Base44 Project
+# WORLDQUEST
 
-Use this repository to run and edit the app locally, then publish changes back through Base44.
+Independent, login-free WorldQuest application. The React/Vite frontend talks to a standalone Node.js API. SQLite stores players, quests, answer keys, submissions, teams, claims, comments, reports and feedback.
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
+## Local development
 
-## Prerequisites
-
-1. Clone the repository using the project's Git URL.
-2. Navigate to the project directory.
-3. Install dependencies: `npm install`.
-4. Install the Base44 CLI: `npm install -g base44@latest`.
-5. Install [Deno](https://docs.deno.com/runtime/getting_started/installation/) — the local Base44 backend runs on it.
-
-Run `base44 --help` (or see the [CLI reference](https://docs.base44.com/developers/references/cli/commands/introduction)) for the full command surface.
-
-## Run Locally
-
-Three commands, from the project root:
+Requirements: Node.js 20+ and npm.
 
 ```bash
-base44 login   # one-time per machine
-base44 link    # one-time per clone
-base44 dev     # local backend + frontend together
+npm install
 ```
 
-Open the frontend URL that `base44 dev` prints (typically `http://localhost:5173`).
-
-Notes:
-
-- **Every fresh clone needs `base44 link`.** It writes `base44/.app.jsonc` (the app-id pointer), which is deliberately gitignored. Your app id is in the Builder URL (`app.base44.com/apps/<id>/...`); `base44 link --help` shows the non-interactive flags.
-- **`base44 dev` runs the frontend for you** (via `site.serveCommand` in this repo's `base44/config.jsonc`) — never run `npm run dev` yourself: alone it serves a UI with no backend behind it (`[base44] Proxy not enabled`, every `/api` call fails), and alongside `base44 dev` the second Vite silently takes the next port and you end up looking at the wrong one.
-- **The app must be published at least once for the UI to load under `base44 dev`.** The frontend boots by fetching app settings from the hosted app; before the first publish that fails and every page redirects to login. The local API works regardless.
-- Entities, functions, and auth run locally — entity data is **in-memory only**, wiped when `base44 dev` restarts. Everything else (Core integrations, OAuth login) is forwarded to your deployed app. Full breakdown: [Local development overview](https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview).
-
-## Frontend Only, Hosted Backend
-
-To work on just the frontend against your app's live hosted backend:
+Start the API in one terminal:
 
 ```bash
-base44 dev --remote
+npm run dev:api
 ```
 
-⚠️ In this mode writes go to your app's **production data** — plain `base44 dev` keeps everything local.
-
-## Publish Your Changes
-
-After pushing your changes to git, open the Base44 dashboard and publish the app:
+Start the frontend in another terminal:
 
 ```bash
-base44 dashboard open
+npm run dev
 ```
 
-This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
+Open http://localhost:5173. Vite proxies `/api` to http://localhost:3001. The API creates `data/worldquest.sqlite` automatically.
 
-## Docs & Support
+## Production deployment
 
-GitHub integration: [https://docs.base44.com/developers/app-code/local-development/github](https://docs.base44.com/developers/app-code/local-development/github)
+Deploy the API as a persistent Node web service (Render is configured by `render.yaml`). It must have a persistent disk mounted at `/var/data`, with `DB_PATH=/var/data/worldquest.sqlite`.
 
-Local development: [https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview](https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview)
+Deploy the frontend as a static site (Netlify, Vercel, or equivalent) using:
 
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+- Build command: `npm run build`
+- Publish directory: `dist`
+- Environment variable: `VITE_API_BASE_URL=https://YOUR-API-SERVICE.onrender.com`
 
+Set the API environment variable `CORS_ORIGIN` to the exact frontend origin (for example, your Netlify URL). Do not use a temporary filesystem for production database storage.
 
----
+## Anonymous player identity
 
-[![Restore to base44](https://img.shields.io/badge/Restore%20to-BASE44-orange?style=for-the-badge&logo=rocket)](https://app.base44.com/apps)
+On first visit the browser generates a Player ID and a private 256-bit device secret. The secret remains in that browser's local storage; the server stores only its SHA-256 hash. Players do not create accounts or enter passwords. Clearing browser storage or changing devices creates a new identity; there is no account recovery mechanism.
+
+## API
+
+- `GET /api/health`
+- `POST /api/playerApi`
+- `POST /api/worldquestApi`
+- `POST /api/teamApi`
+- `POST /api/gradeSubmission`
+- `POST /api/reportQuest`
+- `POST /api/checkLinks`
+
+All player-facing actions require the generated Player ID and device secret. The frontend sends these automatically.
+
+## Database
+
+SQLite is deliberately self-contained for the first independent deployment. Back up the persistent database file regularly. For high-traffic multi-instance deployment, migrate the storage layer to managed PostgreSQL before scaling horizontally.

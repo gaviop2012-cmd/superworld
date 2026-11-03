@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { callApi } from "@/lib/anonymousApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -15,14 +15,13 @@ export default function Studio() {
   const { data: me } = useMe();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
-    queryKey: ["myQuests", me?.id], enabled: !!me,
-    queryFn: async () => (await base44.entities.Quest.filter({ created_by_id: me.id }, { sort: "-updated_date", limit: 100 })).items,
+    queryKey: ["myQuests", me?.id],
+    enabled: !!me,
+    queryFn: async () => (await callApi("worldquestApi", { action: "myQuests" })).quests,
   });
   const remove = async (q) => {
     if (!confirm(`Delete "${q.title}" permanently?`)) return;
-    const keys = (await base44.entities.QuestKey.filter({ quest_id: q.id }, { limit: 5 })).items;
-    await Promise.all(keys.map((k) => base44.entities.QuestKey.delete(k.id)));
-    await base44.entities.Quest.delete(q.id);
+    await callApi("worldquestApi", { action: "deleteQuest", quest_id: q.id });
     qc.invalidateQueries({ queryKey: ["myQuests"] });
   };
   return (

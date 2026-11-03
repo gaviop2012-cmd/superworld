@@ -1,27 +1,26 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import QuestCard from "@/components/QuestCard";
 import { CATEGORIES, LEVELS } from "@/lib/constants";
-
-const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+import { callApi } from "@/lib/anonymousApi";
 
 export default function Discover() {
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("all");
   const [lvl, setLvl] = useState("all");
-  const q = { status: "published", visibility: "public" };
-  if (cat !== "all") q.category = cat;
-  if (lvl !== "all") q.difficulty = Number(lvl);
-  if (search.trim()) q.title = { $regex: esc(search.trim()), $options: "i" };
   const { data, isLoading } = useQuery({
-    queryKey: ["quests", q],
-    queryFn: () => base44.entities.Quest.filter(q, { sort: "difficulty", limit: 100 }),
+    queryKey: ["quests", search, cat, lvl],
+    queryFn: async () => (await callApi("worldquestApi", {
+      action: "listQuests",
+      search: search.trim(),
+      category: cat === "all" ? "" : cat,
+      difficulty: lvl === "all" ? "" : Number(lvl),
+    })).quests,
   });
-  const quests = data?.items || [];
+  const quests = data || [];
 
   return (
     <div>

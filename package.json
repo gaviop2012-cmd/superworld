@@ -1,7 +1,7 @@
 {
-  "name": "base44-app",
+  "name": "worldquest",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,11 +9,11 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:api": "node --watch server/index.js",
+    "start": "node server/index.js"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.57",
-    "@base44/vite-plugin": "^1.0.50",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
     "@radix-ui/react-accordion": "^1.2.3",
@@ -76,7 +76,12 @@
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.171.0",
     "vaul": "^1.1.2",
-    "zod": "^3.24.2"
+    "zod": "^3.24.2",
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "helmet": "^8.1.0",
+    "express-rate-limit": "^7.5.0",
+    "better-sqlite3": "^11.10.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
