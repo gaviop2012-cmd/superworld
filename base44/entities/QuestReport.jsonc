@@ -1,0 +1,51 @@
+{
+  "name": "QuestReport",
+  "type": "object",
+  "properties": {
+    "quest_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "broken_link",
+        "factual_error",
+        "unsafe",
+        "rights",
+        "spoiler_leak",
+        "spam",
+        "other"
+      ]
+    },
+    "details": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "quest_id",
+    "reason"
+  ],
+  "rls": {
+    "read": {
+      "data.user_id": "{{user.id}}"
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
