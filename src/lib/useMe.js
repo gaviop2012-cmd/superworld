@@ -12,8 +12,7 @@ export default function useMe() {
       await registerPlayer();
       return identity;
     },
-    initialData: getPlayerIdentity,
-    staleTime: 0,
+    staleTime: Infinity,
     retry: 1,
   });
 }
