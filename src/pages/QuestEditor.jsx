@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -12,6 +11,7 @@ import ClueEditor from "@/components/ClueEditor";
 import DoctorPanel from "@/components/DoctorPanel";
 import useMe, { displayName } from "@/lib/useMe";
 import { runDoctor, allUrls, splitLines, splitList } from "@/lib/questDoctor";
+import { callApi } from "@/lib/anonymousApi";
 
 const emptyClue = { title: "", instruction: "", start_url: "", sources: "", submission_format: "", hint1: "", hint2: "", finding: "", keywords: "", contribution: "", evidence_excerpt: "", checked_on: "" };
 const emptyForm = () => ({
@@ -26,7 +26,6 @@ export default function QuestEditor() {
   const qc = useQueryClient();
   const { data: me } = useMe();
   const [f, setF] = useState(emptyForm());
-  const [keyId, setKeyId] = useState(null);
   const [loading, setLoading] = useState(!!id);
   const [busy, setBusy] = useState("");
   const [report, setReport] = useState(null);
@@ -34,82 +33,111 @@ export default function QuestEditor() {
 
   useEffect(() => {
     if (!id) return;
+    let active = true;
     (async () => {
-      const q = await base44.entities.Quest.get(id);
-      const k = (await base44.entities.QuestKey.filter({ quest_id: id }, { limit: 1 })).items[0];
-      setKeyId(k?.id || null);
-      setF({
-        quest: { ...emptyForm().quest, ...q },
-        key: { final_answer: k?.final_answer || "", aliases: (k?.aliases || []).join(", "), explanation: k?.explanation || "", rights_ack: !!k?.rights_ack },
-        clues: Array.from({ length: 5 }, (_, i) => {
-          const c = q.clues?.[i] || {}, ck = k?.clue_keys?.[i] || {};
-          return { ...emptyClue, ...c, sources: (c.sources || []).join("\n"), finding: ck.finding || "", keywords: (ck.keywords || []).join(", "), contribution: ck.contribution || "", evidence_excerpt: ck.evidence_excerpt || "", checked_on: ck.checked_on || "" };
-        }),
-      });
-      setLoading(false);
+      try {
+        const data = await callApi("worldquestApi", { action: "loadEditor", quest_id: id });
+        const quest = data.quest;
+        const key = data.key || {};
+        if (!active) return;
+        setF({
+          quest: { ...emptyForm().quest, ...quest },
+          key: { final_answer: key.final_answer || "", aliases: (key.aliases || []).join(", "), explanation: key.explanation || "", rights_ack: !!key.rights_ack },
+          clues: Array.from({ length: 5 }, (_, index) => {
+            const clue = quest.clues?.[index] || {}, clueKey = key.clue_keys?.[index] || {};
+            return {
+              ...emptyClue, ...clue,
+              sources: (clue.sources || []).join("\n"),
+              finding: clueKey.finding || "",
+              keywords: (clueKey.keywords || []).join(", "),
+              contribution: clueKey.contribution || "",
+              evidence_excerpt: clueKey.evidence_excerpt || "",
+              checked_on: clueKey.checked_on || "",
+            };
+          }),
+        });
+      } catch (error) {
+        toast({ title: error.response?.data?.error || "Could not open this quest", variant: "destructive" });
+        nav("/studio", { replace: true });
+      } finally {
+        if (active) setLoading(false);
+      }
     })();
-  }, [id]);
+    return () => { active = false; };
+  }, [id, nav]);
 
-  const setQuest = (p) => setF((s) => ({ ...s, quest: { ...s.quest, ...p } }));
-  const setKey = (p) => setF((s) => ({ ...s, key: { ...s.key, ...p } }));
-  const setClue = (i) => (c) => setF((s) => ({ ...s, clues: s.clues.map((x, j) => (j === i ? c : x)) }));
+  const setQuest = (patch) => setF((state) => ({ ...state, quest: { ...state.quest, ...patch } }));
+  const setKey = (patch) => setF((state) => ({ ...state, key: { ...state.key, ...patch } }));
+  const setClue = (index) => (clue) => setF((state) => ({ ...state, clues: state.clues.map((item, current) => current === index ? clue : item) }));
 
   const doctor = async () => {
     const urls = allUrls(f);
-    let map = {};
+    const map = {};
     if (urls.length) {
-      const { data } = await base44.functions.invoke("checkLinks", { urls });
-      data.results.forEach((r) => { map[r.url] = r; });
+      const data = await callApi("checkLinks", { urls });
+      data.results.forEach((result) => { map[result.url] = result; });
     }
     setLinks(map);
-    const r = runDoctor(f, map);
-    setReport(r);
-    return r;
+    const result = runDoctor(f, map);
+    setReport(result);
+    return result;
   };
 
-  const save = async (patch = {}, r = report) => {
+  const save = async (patch = {}, result = report) => {
     const quest = {
       ...f.quest, ...patch, creator_username: displayName(me),
-      doctor_score: r?.score ?? f.quest.doctor_score ?? 0, doctor_passed: r ? r.canPublish : !!f.quest.doctor_passed,
-      clues: f.clues.map((c) => ({ title: c.title, instruction: c.instruction, start_url: c.start_url, sources: splitLines(c.sources), submission_format: c.submission_format, hint1: c.hint1, hint2: c.hint2 })),
+      doctor_score: result?.score ?? f.quest.doctor_score ?? 0,
+      doctor_passed: result ? result.canPublish : !!f.quest.doctor_passed,
+      clues: f.clues.map((clue) => ({
+        title: clue.title, instruction: clue.instruction, start_url: clue.start_url,
+        sources: splitLines(clue.sources), submission_format: clue.submission_format,
+        hint1: clue.hint1, hint2: clue.hint2,
+      })),
     };
-    delete quest.id; delete quest.created_date; delete quest.updated_date; delete quest.created_by_id; delete quest.created_by; delete quest.is_sample;
     const key = {
-      final_answer: f.key.final_answer, aliases: splitList(f.key.aliases), explanation: f.key.explanation, rights_ack: f.key.rights_ack,
-      clue_keys: f.clues.map((c) => ({ finding: c.finding, keywords: splitList(c.keywords), contribution: c.contribution, evidence_excerpt: c.evidence_excerpt, checked_on: c.checked_on })),
+      final_answer: f.key.final_answer, aliases: splitList(f.key.aliases),
+      explanation: f.key.explanation, rights_ack: f.key.rights_ack,
+      clue_keys: f.clues.map((clue) => ({
+        finding: clue.finding, keywords: splitList(clue.keywords), contribution: clue.contribution,
+        evidence_excerpt: clue.evidence_excerpt, checked_on: clue.checked_on,
+      })),
     };
-    let qid = id;
-    if (id) await base44.entities.Quest.update(id, quest);
-    else qid = (await base44.entities.Quest.create(quest)).id;
-    if (keyId) await base44.entities.QuestKey.update(keyId, key);
-    else setKeyId((await base44.entities.QuestKey.create({ quest_id: qid, ...key })).id);
+    const data = await callApi("worldquestApi", { action: "saveQuest", quest_id: id, quest, key });
+    const questId = data.quest_id;
     qc.invalidateQueries({ queryKey: ["myQuests"] });
     qc.invalidateQueries({ queryKey: ["quests"] });
-    qc.invalidateQueries({ queryKey: ["quest", qid] });
+    qc.invalidateQueries({ queryKey: ["quest", questId] });
     setQuest(patch);
-    return qid;
+    return questId;
   };
 
   const act = (name, fn) => async () => {
     setBusy(name);
-    try { await fn(); } catch (e) { toast({ title: e.response?.data?.error || e.message || "Something went wrong", variant: "destructive" }); }
+    try { await fn(); }
+    catch (error) { toast({ title: error.response?.data?.error || error.message || "Something went wrong", variant: "destructive" }); }
     setBusy("");
   };
 
   const onSave = act("save", async () => {
-    const qid = await save();
+    const questId = await save();
     toast({ title: "Draft saved" });
-    if (!id) nav(`/studio/${qid}`, { replace: true });
+    if (!id) nav(`/studio/${questId}`, { replace: true });
   });
   const onDoctor = act("doctor", doctor);
   const onPublish = act("publish", async () => {
-    const r = await doctor();
-    if (!r.canPublish) return toast({ title: "Quest Doctor found issues. Fix them and try again.", variant: "destructive" });
-    const qid = await save({ status: "published", report_count: 0, validation_status: "Passed automated Quest Doctor; awaiting community playtests" }, r);
+    const result = await doctor();
+    if (!result.canPublish) return toast({ title: "Quest Doctor found issues. Fix them and try again.", variant: "destructive" });
+    const questId = await save({
+      status: "published", report_count: 0,
+      validation_status: "Passed automated Quest Doctor; awaiting community playtests",
+    }, result);
     toast({ title: f.quest.visibility === "private" ? "Saved as a private quest" : "Quest published" });
-    nav(`/quest/${qid}`);
+    nav(`/quest/${questId}`);
   });
-  const onUnpublish = act("unpublish", async () => { await save({ status: "draft" }); toast({ title: "Moved back to draft" }); });
+  const onUnpublish = act("unpublish", async () => {
+    await save({ status: "draft" });
+    toast({ title: "Moved back to draft" });
+  });
 
   if (loading) return <Loader2 className="w-6 h-6 animate-spin mx-auto my-16" />;
   const published = f.quest.status === "published";
@@ -121,10 +149,10 @@ export default function QuestEditor() {
       <div>
         <h2 className="font-display text-2xl mb-2">The five clues</h2>
         <Accordion type="multiple" defaultValue={["c0"]} className="border rounded-lg px-4">
-          {f.clues.map((c, i) => (
-            <AccordionItem key={i} value={`c${i}`}>
-              <AccordionTrigger>Clue {i + 1}{c.title ? ` · ${c.title}` : ""}</AccordionTrigger>
-              <AccordionContent><ClueEditor clue={c} onChange={setClue(i)} /></AccordionContent>
+          {f.clues.map((clue, index) => (
+            <AccordionItem key={index} value={`c${index}`}>
+              <AccordionTrigger>Clue {index + 1}{clue.title ? ` · ${clue.title}` : ""}</AccordionTrigger>
+              <AccordionContent><ClueEditor clue={clue} onChange={setClue(index)} /></AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
