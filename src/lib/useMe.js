@@ -1,8 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { getPlayerIdentity } from "@/lib/playerIdentity";
 
-export const displayName = (u) => u?.username || u?.full_name || (u?.email || "player").split("@")[0];
+export const displayName = (player) => player?.username || "Player";
 
 export default function useMe() {
-  return useQuery({ queryKey: ["me"], queryFn: () => base44.auth.me() });
+  return useQuery({
+    queryKey: ["me"],
+    queryFn: getPlayerIdentity,
+    initialData: getPlayerIdentity,
+    staleTime: Infinity,
+  });
 }
