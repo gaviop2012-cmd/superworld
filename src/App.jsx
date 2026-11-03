@@ -12,8 +12,31 @@ import QuestEditor from "@/pages/QuestEditor";
 import Teams from "@/pages/Teams";
 import TeamRoom from "@/pages/TeamRoom";
 import Profile from "@/pages/Profile";
+import useMe from "@/lib/useMe";
+import { Button } from "@/components/ui/button";
 
 function AppRoutes() {
+  const player = useMe();
+
+  if (player.isLoading) {
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-background">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
+        <p className="text-sm text-muted-foreground">Preparing your Player ID…</p>
+      </div>
+    );
+  }
+
+  if (player.isError) {
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+        <h1 className="font-display text-2xl">WorldQuest could not connect</h1>
+        <p className="max-w-md text-sm text-muted-foreground">Your local Player ID is ready, but the game service did not respond. Check that the Base44 app is published and set to Public, then try again.</p>
+        <Button onClick={() => player.refetch()}>Retry</Button>
+      </div>
+    );
+  }
+
   return (
     <Routes>
       <Route element={<Layout />}>
