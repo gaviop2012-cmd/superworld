@@ -1,12 +1,15 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
-import { nameOf, rows, hasPhrase, clueMatches, err, safeUrl } from '../../shared/util.ts';
+import { rows, hasPhrase, clueMatches, err, safeUrl, verifyPlayer } from '../../shared/anonymous.ts';
 
 export default async function (req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me().catch((e: any) => (e.status === 401 ? null : Promise.reject(e)));
-    if (!user) return err('Unauthorized', 401);
-    const { quest_id, kind, clue_index, answer, source_url, team_id } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    const player = await verifyPlayer(base44, body);
+    if (!player) return err('Your Player ID could not be verified. Refresh the app and try again.', 401);
+    const { quest_id, kind, clue_index, answer, source_url, team_id } = body;
+    const playerId = player.player_id;
+    const username = player.username || `Player-${playerId.slice(-4)}`;
     const text = String(answer || '').trim();
     if (!quest_id || !['clue', 'final'].includes(kind)) return err('Invalid request');
     if (text.length < 2 || text.length > 2000) return err('Answer must be between 2 and 2000 characters');
@@ -15,16 +18,16 @@ export default async function (req: Request): Promise<Response> {
 
     const sr = base44.asServiceRole;
     const quest = await sr.entities.Quest.get(quest_id).catch((e: any) => (e.status === 404 ? null : Promise.reject(e)));
-    const isOwner = quest && quest.created_by_id === user.id;
+    const isOwner = quest && quest.creator_player_id === playerId;
     if (!quest || (quest.status !== 'published' && !isOwner)) return err('Quest not found', 404);
     if (quest.visibility === 'private' && !isOwner) return err('This quest is private', 403);
 
     let team: any = null;
     if (team_id) {
       team = await sr.entities.Team.get(team_id).catch((e: any) => (e.status === 404 ? null : Promise.reject(e)));
-      if (!team || !(team.member_ids || []).includes(user.id)) return err('You are not on that team', 403);
+      if (!team || !(team.member_ids || []).includes(playerId)) return err('You are not on that team', 403);
     }
-    const scope = team ? { quest_id, team_id } : { quest_id, user_id: user.id, team_id: '' };
+    const scope = team ? { quest_id, team_id } : { quest_id, player_id: playerId, team_id: '' };
 
     const keys = rows(await sr.entities.QuestKey.filter({ quest_id }, { limit: 1 }));
     const key = keys[0];
@@ -39,7 +42,7 @@ export default async function (req: Request): Promise<Response> {
       if (![1, 2, 3, 4, 5].every((n) => got.has(n))) return err('Solve all five clues with evidence before the final answer', 409);
     }
 
-    const recent = rows(await sr.entities.Submission.filter({ quest_id, user_id: user.id, kind, clue_index: idx, correct: false }, { sort: '-created_date', limit: 8 }));
+    const recent = rows(await sr.entities.Submission.filter({ quest_id, player_id: playerId, kind, clue_index: idx, correct: false }, { sort: '-created_date', limit: 8 }));
     if (recent.length >= 8 && Date.now() - new Date(recent[7].created_date).getTime() < 60000) {
       return err('Too many attempts. Wait a minute and try again.', 429);
     }
@@ -53,7 +56,7 @@ export default async function (req: Request): Promise<Response> {
     }
 
     await sr.entities.Submission.create({
-      quest_id, team_id: team ? team_id : '', user_id: user.id, username: nameOf(user),
+      quest_id, team_id: team ? team_id : '', player_id: playerId, username,
       kind, clue_index: idx, text, source_url: safeUrl(source_url), correct,
     });
 
@@ -66,6 +69,6 @@ export default async function (req: Request): Promise<Response> {
       explanation: correct && kind === 'final' ? key.explanation || '' : undefined,
     });
   } catch (error: any) {
-    return err(error.message, 500);
+    return err(error.message || 'Could not grade this answer', 500);
   }
 }
