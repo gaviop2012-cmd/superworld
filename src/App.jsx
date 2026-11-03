@@ -31,7 +31,7 @@ function AppRoutes() {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-background px-6 text-center">
         <h1 className="font-display text-2xl">WorldQuest could not connect</h1>
-        <p className="max-w-md text-sm text-muted-foreground">Your local Player ID is ready, but the game service did not respond. Check that the Base44 app is published and set to Public, then try again.</p>
+        <p className="max-w-md text-sm text-muted-foreground">Your local Player ID is ready, but the game service did not respond. Check that the WorldQuest API service is running and try again.</p>
         <Button onClick={() => player.refetch()}>Retry</Button>
       </div>
     );
