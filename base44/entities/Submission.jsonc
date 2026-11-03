@@ -33,6 +33,9 @@
     "correct": {
       "type": "boolean",
       "default": false
+    },
+    "player_id": {
+      "type": "string"
     }
   },
   "required": [
