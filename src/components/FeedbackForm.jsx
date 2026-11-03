@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Star } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { callApi } from "@/lib/anonymousApi";
 
 export default function FeedbackForm({ questId, onDone }) {
   const [rating, setRating] = useState(0);
@@ -19,9 +19,13 @@ export default function FeedbackForm({ questId, onDone }) {
   if (sent) return <Card className="p-5 text-sm">Thanks for the feedback.</Card>;
   const send = async () => {
     if (!rating) return toast({ title: "Pick a star rating first", variant: "destructive" });
-    await base44.entities.QuestFeedback.create({ quest_id: questId, rating, clarity, difficulty_feel: feel, broken_link: broken, comment });
-    setSent(true);
-    onDone?.();
+    try {
+      await callApi("worldquestApi", { action: "feedbackCreate", quest_id: questId, rating, clarity, difficulty_feel: feel, broken_link: broken, comment });
+      setSent(true);
+      onDone?.();
+    } catch (error) {
+      toast({ title: error.response?.data?.error || "Could not send feedback", variant: "destructive" });
+    }
   };
   return (
     <Card className="p-5 space-y-3">
