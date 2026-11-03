@@ -1,7 +1,6 @@
 import React from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
-import { Compass, PenTool, Users, UserCircle, LogOut } from "lucide-react";
+import { Compass, PenTool, Users, UserCircle, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import useMe, { displayName } from "@/lib/useMe";
 
@@ -27,17 +26,13 @@ export default function Layout() {
               </NavLink>
             ))}
           </nav>
-          <span className="text-sm text-white/70 hidden md:block">{me && displayName(me)}</span>
-          <Button size="icon" variant="ghost" className="text-white hover:bg-white/10 hover:text-white" onClick={() => base44.auth.logout()} aria-label="Log out">
-            <LogOut className="w-4 h-4" />
+          <span className="text-sm text-white/80 hidden md:block">{me && displayName(me)}</span>
+          <Button size="sm" variant="ghost" className="text-white hover:bg-white/10 hover:text-white" title="Copy your Player ID"
+            onClick={() => navigator.clipboard?.writeText(me?.id || "")}>
+            <Copy className="w-4 h-4 mr-1" /><span className="hidden sm:inline">{me?.id || "Player ID"}</span>
           </Button>
         </div>
       </header>
-      {me && !me.username && (
-        <div className="bg-primary/15 text-foreground text-sm text-center py-2 border-b border-primary/40">
-          Pick a username so teammates know who you are. <Link to="/profile" className="underline font-medium">Set it now</Link>
-        </div>
-      )}
       <main className="max-w-6xl mx-auto px-4 py-8"><Outlet /></main>
     </div>
   );
