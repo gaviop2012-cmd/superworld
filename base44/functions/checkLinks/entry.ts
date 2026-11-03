@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
 import { err, safeUrl, verifyPlayer } from '../../shared/anonymous.ts';
 
-const PRIVATE_HOST = /^(localhost|127\\.|10\\.|192\\.168\\.|169\\.254\\.|172\\.(1[6-9]|2\\d|3[01])\\.|0\\.|\\[?::1)|\\.(internal|local|localhost)$/i;
+const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.|\[?::1)|\.(internal|local|localhost)$/i;
 
 async function check(url: string) {
   const u = safeUrl(url);
@@ -18,7 +18,7 @@ async function check(url: string) {
     return {
       url, status: res.status, final_url: res.url, redirected: res.url !== u,
       ok: res.ok, blocked,
-      note: res.ok ? 'Loads' : blocked ? 'Site blocks automated checks - verify by hand' : `HTTP ${res.status}`,
+      note: res.ok ? 'Loads' : blocked ? 'Site blocks automated checks - verify by hand' : ('HTTP ' + res.status),
     };
   } catch {
     return { url, ok: false, status: 0, note: 'Could not reach this address' };
