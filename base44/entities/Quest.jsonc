@@ -119,6 +119,9 @@
     "report_count": {
       "type": "number",
       "default": 0
+    },
+    "creator_player_id": {
+      "type": "string"
     }
   },
   "required": [
