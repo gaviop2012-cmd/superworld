@@ -30,6 +30,9 @@
     },
     "comment": {
       "type": "string"
+    },
+    "player_id": {
+      "type": "string"
     }
   },
   "required": [
